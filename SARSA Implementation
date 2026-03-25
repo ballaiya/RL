@@ -1,0 +1,92 @@
+!pip install gym
+import numpy as np
+if not hasattr(np, 'bool8'):
+    np.bool8 = np.bool_
+
+import gym
+import matplotlib.pyplot as plt
+from collections import defaultdict
+
+class SARSAAgent:
+    def __init__(self, env, alpha=0.1, gamma=0.99, epsilon=0.1):
+        self.env = env
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.q_table = defaultdict(float)
+
+    def choose_action(self, state):
+        if np.random.rand() < self.epsilon:
+            return self.env.action_space.sample()
+        else:
+            q_values = [self.q_table[(state, action)] for action in range(self.env.action_space.n)]
+            max_q = max(q_values)
+            return np.random.choice([action for action, q in enumerate(q_values) if q == max_q])
+
+    def learn(self, state, action, reward, next_state, next_action):
+        td_target = reward + self.gamma * self.q_table[(next_state, next_action)]
+        td_error = td_target - self.q_table[(state, action)]
+        self.q_table[(state, action)] += self.alpha * td_error
+
+    def train(self, episodes):
+        rewards = []
+        for episode in range(episodes):
+            result = self.env.reset()
+            state = result[0] if isinstance(result, tuple) else result
+            action = self.choose_action(state)
+            total_reward = 0
+            done = False
+
+            while not done:
+                step_result = self.env.step(action)
+                if len(step_result) == 5:
+                    next_state, reward, terminated, truncated, _ = step_result
+                    done = terminated or truncated
+                else:
+                    next_state, reward, done, _ = step_result
+
+                next_action = self.choose_action(next_state)
+                self.learn(state, action, reward, next_state, next_action)
+                state, action = next_state, next_action
+                total_reward += reward
+
+            rewards.append(total_reward)
+            if (episode + 1) % 100 == 0:
+                print(f"Episode {episode + 1}/{episodes} - Total Reward: {total_reward}")
+
+        return rewards
+
+    def evaluate(self, episodes):
+        total_rewards = 0
+        for episode in range(episodes):
+            result = self.env.reset()
+            state = result[0] if isinstance(result, tuple) else result
+            done = False
+
+            while not done:
+                action = self.choose_action(state)
+                step_result = self.env.step(action)
+                if len(step_result) == 5:
+                    next_state, reward, terminated, truncated, _ = step_result
+                    done = terminated or truncated
+                else:
+                    next_state, reward, done, _ = step_result
+
+                total_rewards += reward
+                state = next_state
+
+        average_reward = total_rewards / episodes
+        print(f"Average Reward over {episodes} episodes: {average_reward}")
+        return average_reward
+
+
+env = gym.make("Taxi-v3", render_mode="rgb_array")
+agent = SARSAAgent(env)
+training_rewards = agent.train(episodes=1000)
+agent.evaluate(episodes=100)
+
+plt.plot(training_rewards)
+plt.xlabel('Episode')
+plt.ylabel('Total Reward')
+plt.title('Training Rewards over Episodes (SARSA)')
+plt.show()
