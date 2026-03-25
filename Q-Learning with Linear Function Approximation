@@ -1,0 +1,107 @@
+import numpy as np
+if not hasattr(np, 'bool8'):
+    np.bool8 = np.bool_
+
+import gym
+
+class LinearQAgent:
+    def __init__(self, state_size, action_size, alpha=0.01, gamma=0.9,
+                 epsilon=1.0, epsilon_decay=0.995):
+        self.state_size = state_size
+        self.action_size = action_size
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.epsilon_decay = epsilon_decay
+        self.weights = np.zeros((action_size, state_size))
+
+    def featurize_state(self, state):
+        feature_vector = np.zeros(self.state_size)
+        feature_vector[state] = 1
+        return feature_vector
+
+    def get_q_value(self, state, action):
+        features = self.featurize_state(state)
+        return np.dot(self.weights[action], features)
+
+    def select_action(self, state):
+        if np.random.rand() < self.epsilon:
+            return np.random.choice(self.action_size)
+        else:
+            q_values = [self.get_q_value(state, a) for a in range(self.action_size)]
+            return np.argmax(q_values)
+
+    def update(self, state, action, reward, next_state, done):
+        features = self.featurize_state(state)
+        q_value = self.get_q_value(state, action)
+
+        if done:
+            target = reward
+        else:
+            next_q_values = [self.get_q_value(next_state, a) for a in range(self.action_size)]
+            target = reward + self.gamma * np.max(next_q_values)
+
+        error = target - q_value
+        self.weights[action] += self.alpha * error * features
+
+        if self.epsilon > 0.1:
+            self.epsilon *= self.epsilon_decay
+
+
+env = gym.make("Taxi-v3", render_mode="ansi")
+state_size = env.observation_space.n
+action_size = env.action_space.n
+
+agent = LinearQAgent(state_size, action_size)
+
+episodes = 5000
+rewards = []
+
+for episode in range(episodes):
+    state = env.reset()[0]
+    total_reward = 0
+
+    while True:
+        action = agent.select_action(state)
+        step_result = env.step(action)
+
+        if len(step_result) == 5:
+            next_state, reward, terminated, truncated, _ = step_result
+            done = terminated or truncated
+        else:
+            next_state, reward, done, _ = step_result
+
+        agent.update(state, action, reward, next_state, done)
+        state = next_state
+        total_reward += reward
+
+        if done:
+            break
+
+    rewards.append(total_reward)
+
+    if (episode + 1) % 500 == 0:
+        print(f"Episode {episode + 1}, Average Reward (last 500 episodes): "
+              f"{np.mean(rewards[-500:]):.3f}")
+
+# Testing the trained agent
+state = env.reset()[0]
+print(env.render())
+
+for _ in range(10):
+    action = agent.select_action(state)
+    step_result = env.step(action)
+
+    if len(step_result) == 5:
+        next_state, reward, terminated, truncated, _ = step_result
+        done = terminated or truncated
+    else:
+        next_state, reward, done, _ = step_result
+
+    state = next_state
+    print(env.render())
+
+    if done:
+        break
+
+env.close()
