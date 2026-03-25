@@ -17,7 +17,7 @@ class LinearQAgent:
 
     def featurize_state(self, state):
         feature_vector = np.zeros(self.state_size)
-        feature_vector[state] = 1
+        feature_vector[int(state)] = 1
         return feature_vector
 
     def get_q_value(self, state, action):
@@ -49,6 +49,7 @@ class LinearQAgent:
 
 
 env = gym.make("Taxi-v3", render_mode="ansi")
+
 state_size = env.observation_space.n
 action_size = env.action_space.n
 
@@ -58,7 +59,9 @@ episodes = 5000
 rewards = []
 
 for episode in range(episodes):
-    state = env.reset()[0]
+    reset_result = env.reset()
+    state = reset_result[0] if isinstance(reset_result, tuple) else reset_result
+
     total_reward = 0
 
     while True:
@@ -81,11 +84,11 @@ for episode in range(episodes):
     rewards.append(total_reward)
 
     if (episode + 1) % 500 == 0:
-        print(f"Episode {episode + 1}, Average Reward (last 500 episodes): "
-              f"{np.mean(rewards[-500:]):.3f}")
+        print(f"Episode {episode + 1}, Average Reward: {np.mean(rewards[-500:]):.3f}")
 
-# Testing the trained agent
-state = env.reset()[0]
+reset_result = env.reset()
+state = reset_result[0] if isinstance(reset_result, tuple) else reset_result
+
 print(env.render())
 
 for _ in range(10):
