@@ -1,0 +1,78 @@
+import random
+
+states = ["hungry", "safe", "dangerous", "rested", "in_shelter"]
+actions = ["search_food", "build_shelter", "rest"]
+
+rewards = {
+    ("hungry", "search_food"): 100,
+    ("hungry", "build_shelter"): -50,
+    ("hungry", "rest"): -100,
+    ("safe", "search_food"): 10,
+    ("safe", "build_shelter"): 5,
+    ("safe", "rest"): 100,
+    ("dangerous", "search_food"): -50,
+    ("dangerous", "build_shelter"): 100,
+    ("dangerous", "rest"): -100,
+    ("rested", "search_food"): 100,
+    ("rested", "build_shelter"): 5,
+    ("rested", "rest"): -50,
+    ("in_shelter", "search_food"): -50,
+    ("in_shelter", "build_shelter"): 0,
+    ("in_shelter", "rest"): 100,
+}
+
+def transition(state, action):
+    if action == "search_food":
+        return random.choice(["hungry", "safe", "dangerous"])
+    elif action == "build_shelter":
+        return "in_shelter" if state != "dangerous" else "dangerous"
+    elif action == "rest":
+        return "rested" if state in ["safe", "in_shelter"] else "dangerous"
+    return state
+
+
+def monte_carlo_control(states, actions, rewards, num_episodes=10000, epsilon=0.1, discount_factor=0.9):
+    returns = {(state, action): [] for state in states for action in actions}
+    values = {(state, action): 0 for state in states for action in actions}
+    policy = {state: random.choice(actions) for state in states}
+
+    for episode in range(num_episodes):
+        episode_history = []
+        state = random.choice(states)
+
+        while True:
+            if random.uniform(0, 1) < epsilon:
+                action = random.choice(actions)  # Explore
+            else:
+                action = policy[state]           # Exploit
+
+            new_state = transition(state, action)
+            reward = rewards.get((state, action), -100)
+            episode_history.append((state, action, reward))
+
+            if new_state == "dangerous":  # End episode if state becomes dangerous
+                break
+
+            state = new_state
+
+        G = 0
+        visited = set()
+
+        for state, action, reward in reversed(episode_history):
+            G = reward + discount_factor * G
+
+            if (state, action) not in visited:
+                returns[(state, action)].append(G)
+                values[(state, action)] = sum(returns[(state, action)]) / len(returns[(state, action)])
+                visited.add((state, action))
+
+        for state in states:
+            best_action = max(actions, key=lambda a: values[(state, a)])
+            policy[state] = best_action
+
+    return values, policy
+
+
+values_mc, policy_mc = monte_carlo_control(states, actions, rewards)
+print("MC - Value for each (state, action):", values_mc)
+print("MC - Learned policy:", policy_mc)
