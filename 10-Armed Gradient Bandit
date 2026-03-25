@@ -1,0 +1,64 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+class GradientBandit:
+    def __init__(self, k=10, alpha=0.1):
+        self.k = k                              # Number of arms
+        self.alpha = alpha                      # Step size (learning rate)
+        self.preferences = np.zeros(k)         # Preferences for each action
+        self.probabilities = np.ones(k) / k    # Initial uniform probabilities
+        self.average_reward = 0                 # Baseline for the reward
+
+    def softmax(self):
+        exp_preferences = np.exp(self.preferences - np.max(self.preferences))
+        self.probabilities = exp_preferences / np.sum(exp_preferences)
+        return self.probabilities
+
+    def choose_action(self):
+        self.softmax()
+        return np.random.choice(self.k, p=self.probabilities)
+
+    def update(self, action, reward, t):
+        self.average_reward += (reward - self.average_reward) / (t + 1)
+        reward_baseline = reward - self.average_reward
+
+        for a in range(self.k):
+            if a == action:
+                self.preferences[a] += self.alpha * (reward_baseline) * (1 - self.probabilities[a])
+            else:
+                self.preferences[a] -= self.alpha * (reward_baseline) * self.probabilities[a]
+
+
+def simulate_gradient_bandit(k=10, alpha=0.1, runs=2000, steps=1000):
+    avg_rewards = np.zeros(steps)
+
+    for run in range(runs):
+        bandit = GradientBandit(k=k, alpha=alpha)
+        q_true = np.random.normal(0, 1, k)
+        rewards = np.zeros(steps)
+
+        for t in range(steps):
+            action = bandit.choose_action()
+            reward = np.random.normal(q_true[action], 1)
+            rewards[t] = reward
+            bandit.update(action, reward, t)
+
+        avg_rewards += rewards
+
+    avg_rewards /= runs  # Average over all runs
+    return avg_rewards
+
+
+k = 10
+alpha = 0.1
+runs = 2000
+steps = 1000
+
+avg_rewards = simulate_gradient_bandit(k, alpha, runs, steps)
+
+# Plotting results
+plt.plot(avg_rewards)
+plt.xlabel("Steps")
+plt.ylabel("Average Reward")
+plt.title("10-armed Gradient Bandit (alpha=0.1)")
+plt.show()
