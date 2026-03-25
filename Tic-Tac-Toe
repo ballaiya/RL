@@ -1,0 +1,147 @@
+import numpy as np
+import random
+
+class TicTacToe:
+    def __init__(self):
+        self.board = np.zeros((3, 3))
+        self.done = False
+        self.winner = None
+
+    def reset(self):
+        self.board = np.zeros((3, 3))
+        self.done = False
+        self.winner = None
+        return self.get_state()
+
+    def get_state(self):
+        return tuple(self.board.flatten())
+
+    def is_valid_move(self, row, col):
+        return self.board[row, col] == 0
+
+    def make_move(self, row, col, player):
+        if self.is_valid_move(row, col):
+            self.board[row, col] = player
+            if self.check_winner(player):
+                self.done = True
+                self.winner = player
+            elif np.all(self.board != 0):
+                self.done = True  # Draw
+            return True
+        return False
+
+    def check_winner(self, player):
+        for i in range(3):
+            if np.all(self.board[i, :] == player) or np.all(self.board[:, i] == player):
+                return True
+        if np.all(np.diag(self.board) == player) or np.all(np.diag(np.fliplr(self.board)) == player):
+            return True
+        return False
+
+    def print_board(self):
+        symbol_map = {1: 'X', -1: 'O', 0: ' '}
+        print("\nBoard:")
+        for row in self.board:
+            print('|'.join([symbol_map[int(cell)] for cell in row]))
+        print("-" * 5)
+
+
+class QLearningAgent:
+    def __init__(self, player, alpha=0.1, gamma=0.9, epsilon=0.1):
+        self.q_table = {}
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.player = player
+
+    def choose_action(self, state, available_actions):
+        if random.uniform(0, 1) < self.epsilon:
+            return random.choice(available_actions)
+        else:
+            q_values = [self.q_table.get((state, action), 0) for action in available_actions]
+            max_q_value = max(q_values)
+            max_q_actions = [action for action, q_value in zip(available_actions, q_values)
+                             if q_value == max_q_value]
+            return random.choice(max_q_actions)
+
+    def update_q_table(self, state, action, reward, next_state, available_actions):
+        current_q = self.q_table.get((state, action), 0)
+        if available_actions:
+            next_q_values = [self.q_table.get((next_state, a), 0) for a in available_actions]
+            max_next_q = max(next_q_values)
+        else:
+            max_next_q = 0
+        self.q_table[(state, action)] = current_q + self.alpha * (reward + self.gamma * max_next_q - current_q)
+
+
+def train_tic_tac_toe(episodes=10000):
+    game = TicTacToe()
+    agent_X = QLearningAgent(player=1)
+    agent_O = QLearningAgent(player=-1)
+    agents = {1: agent_X, -1: agent_O}
+
+    for _ in range(episodes):
+        state = game.reset()
+        player = 1  # Start with player X
+
+        while not game.done:
+            available_actions = [(r, c) for r in range(3) for c in range(3)
+                                 if game.is_valid_move(r, c)]
+            agent = agents[player]
+            action = agent.choose_action(state, available_actions)
+            game.make_move(action[0], action[1], player)
+            next_state = game.get_state()
+            available_next_actions = [(r, c) for r in range(3) for c in range(3)
+                                      if game.is_valid_move(r, c)]
+
+            if game.done:
+                if game.winner == player:
+                    reward = 1
+                elif game.winner is None:  # Draw
+                    reward = 0.5
+                else:
+                    reward = -1
+            else:
+                reward = 0
+
+            agent.update_q_table(state, action, reward, next_state, available_next_actions)
+            state = next_state
+            player = -player  # Switch players
+
+    return agent_X.q_table, agent_O.q_table
+
+
+q_table_X, q_table_O = train_tic_tac_toe(episodes=10000)
+
+
+def test_tic_tac_toe():
+    game = TicTacToe()
+    agent_X = QLearningAgent(player=1)
+    agent_O = QLearningAgent(player=-1)
+    agent_X.q_table = q_table_X
+    agent_O.q_table = q_table_O
+    agents = {1: agent_X, -1: agent_O}
+
+    state = game.reset()
+    player = 1  # Start with player X
+
+    while not game.done:
+        game.print_board()
+        available_actions = [(r, c) for r in range(3) for c in range(3)
+                             if game.is_valid_move(r, c)]
+        agent = agents[player]
+        action = agent.choose_action(state, available_actions)
+        game.make_move(action[0], action[1], player)
+        state = game.get_state()
+        player = -player  # Switch players
+
+    print("Final Board:")
+    game.print_board()
+
+    if game.winner:
+        print(f"Player {game.winner} ({'X' if game.winner == 1 else 'O'}) wins!")
+    else:
+        print("It's a draw!")
+
+
+test_tic_tac_toe()
