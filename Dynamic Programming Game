@@ -1,0 +1,80 @@
+import random
+
+states = ["hungry", "safe", "dangerous", "rested", "in_shelter"]
+actions = ["search_food", "build_shelter", "rest"]
+
+rewards = {
+    ("hungry", "search_food"): 100,
+    ("hungry", "build_shelter"): -50,
+    ("hungry", "rest"): -100,
+    ("safe", "search_food"): 10,
+    ("safe", "build_shelter"): 5,
+    ("safe", "rest"): 100,
+    ("dangerous", "search_food"): -50,
+    ("dangerous", "build_shelter"): 100,
+    ("dangerous", "rest"): -100,
+    ("rested", "search_food"): 100,
+    ("rested", "build_shelter"): 5,
+    ("rested", "rest"): -50,
+    ("in_shelter", "search_food"): -50,
+    ("in_shelter", "build_shelter"): 0,
+    ("in_shelter", "rest"): 100,
+}
+
+# Define the state transition function
+def transition(state, action):
+    if action == "search_food":
+        return random.choice(["hungry", "safe", "dangerous"])
+    elif action == "build_shelter":
+        return "in_shelter" if state != "dangerous" else "dangerous"
+    elif action == "rest":
+        return "rested" if state in ["safe", "in_shelter"] else "dangerous"
+    return state
+
+
+def value_iteration(states, actions, rewards, discount_factor=0.9, theta=1e-4):
+    # Initialize values for each state
+    values = {state: 0 for state in states}
+
+    while True:
+        delta = 0
+        for state in states:
+            v = values[state]
+            action_values = []
+
+            for action in actions:
+                new_state = transition(state, action)
+                reward = rewards.get((state, action), -100)  # Use -100 for illegal actions
+                action_values.append(reward + discount_factor * values[new_state])
+
+            values[state] = max(action_values)
+            delta = max(delta, abs(v - values[state]))
+
+        if delta < theta:
+            break
+
+    # Derive the optimal policy based on values
+    policy = {}
+    for state in states:
+        best_action = None
+        best_value = float('-inf')
+
+        for action in actions:
+            new_state = transition(state, action)
+            reward = rewards.get((state, action), -100)
+            value = reward + discount_factor * values[new_state]
+
+            if value > best_value:
+                best_value = value
+                best_action = action
+
+        policy[state] = best_action
+
+    return values, policy
+
+
+values, policy = value_iteration(states, actions, rewards)
+print("State values:", values)
+print("Optimal policy:", policy)
+
+
