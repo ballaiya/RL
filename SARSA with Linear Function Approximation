@@ -1,0 +1,73 @@
+import numpy as np
+if not hasattr(np, 'bool8'):
+    np.bool8 = np.bool_
+
+import gym
+
+class LinearSARSA:
+    def __init__(self, state_dim, action_dim, alpha=0.01, gamma=0.99, epsilon=0.1):
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.weights = np.random.rand(state_dim * action_dim)
+
+    def featurize_state_action(self, state, action):
+        features = np.zeros(self.state_dim * self.action_dim)
+        features[action * self.state_dim:(action + 1) * self.state_dim] = state
+        return features
+
+    def q_value(self, state, action):
+        features = self.featurize_state_action(state, action)
+        return np.dot(self.weights, features)
+
+    def select_action(self, state):
+        if np.random.rand() < self.epsilon:
+            return np.random.choice(self.action_dim)
+        else:
+            q_values = [self.q_value(state, a) for a in range(self.action_dim)]
+            return np.argmax(q_values)
+
+    def update(self, state, action, reward, next_state, next_action):
+        current_q = self.q_value(state, action)
+        next_q = self.q_value(next_state, next_action)
+        target = reward + self.gamma * next_q
+        td_error = target - current_q
+        self.weights += self.alpha * td_error * self.featurize_state_action(state, action)
+
+
+env = gym.make("CartPole-v1")
+state_dim = env.observation_space.shape[0]
+action_dim = env.action_space.n
+
+agent = LinearSARSA(state_dim, action_dim)
+
+num_episodes = 50
+
+for episode in range(num_episodes):
+    state = env.reset()
+    state = state[0] if isinstance(state, tuple) else state
+    action = agent.select_action(state)
+    total_reward = 0
+
+    while True:
+        step_result = env.step(action)
+
+        if len(step_result) == 5:
+            next_state, reward, terminated, truncated, _ = step_result
+            done = terminated or truncated
+        else:
+            next_state, reward, done, _ = step_result
+
+        next_action = agent.select_action(next_state)
+        agent.update(state, action, reward, next_state, next_action)
+        state, action = next_state, next_action
+        total_reward += reward
+
+        if done:
+            break
+
+    print(f"Episode {episode + 1}: Total Reward = {total_reward}")
+
+env.close()
